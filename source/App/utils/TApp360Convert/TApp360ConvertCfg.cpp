@@ -270,6 +270,24 @@ Void TApp360ConvertCfg::setDefaultFramePackingParam(SVideoInfo& sVideoInfo)
       frmPack.cols = 1;
       frmPack.faces[0][0].id = 0; frmPack.faces[0][0].rot = 0;
   }
+  else if (sVideoInfo.geoType == SVIDEO_NEWUNIFORMMAP
+#if SVIDEO_ADJUSTED_EQUALAREA
+	  || sVideoInfo.geoType == SVIDEO_ADJUSTEDEQUALAREA
+#else
+	  || sVideoInfo.geoType == SVIDEO_EQUALAREA
+#endif
+	  || sVideoInfo.geoType == SVIDEO_VIEWPORT
+#if SVIDEO_CPPPSNR
+	  || sVideoInfo.geoType == SVIDEO_CRASTERSPARABOLIC
+#endif
+	  )
+  {
+	  SVideoFPStruct &frmPack = sVideoInfo.framePackStruct;
+	  frmPack.chromaFormatIDC = CHROMA_420;
+	  frmPack.rows = 1;
+	  frmPack.cols = 1;
+	  frmPack.faces[0][0].id = 0; frmPack.faces[0][0].rot = 0;
+  }
   else if(  (sVideoInfo.geoType == SVIDEO_CUBEMAP)
 #if SVIDEO_ADJUSTED_CUBEMAP
           ||(sVideoInfo.geoType == SVIDEO_ADJUSTEDCUBEMAP)
@@ -884,6 +902,47 @@ Void TApp360ConvertCfg::fillSourceSVideoInfo(SVideoInfo& sVidInfo, Int inputWidt
     //sVidInfo.framePackStruct.faces[0][0].width = sVidInfo.iFaceWidth;
     //sVidInfo.framePackStruct.faces[0][0].height = sVidInfo.iFaceHeight;
   }
+  else if (sVidInfo.geoType == SVIDEO_NEWUNIFORMMAP
+#if SVIDEO_ADJUSTED_EQUALAREA
+	  || sVidInfo.geoType == SVIDEO_ADJUSTEDEQUALAREA
+#else
+	  || sVidInfo.geoType == SVIDEO_EQUALAREA
+#endif
+	  || sVidInfo.geoType == SVIDEO_VIEWPORT
+#if SVIDEO_CPPPSNR
+	  || sVidInfo.geoType == SVIDEO_CRASTERSPARABOLIC
+#endif
+	  )
+  {
+	  //assert(sVidInfo.framePackStruct.rows == 1);
+	  //assert(sVidInfo.framePackStruct.cols == 1);
+	  //enforce;
+	  sVidInfo.framePackStruct.rows = 1;
+	  sVidInfo.framePackStruct.cols = 1;
+	  sVidInfo.framePackStruct.faces[0][0].id = 0;
+	  //sVidInfo.framePackStruct.faces[0][0].rot = 0;
+	  sVidInfo.iNumFaces = 1;
+	  if (sVidInfo.framePackStruct.faces[0][0].rot == 90 || sVidInfo.framePackStruct.faces[0][0].rot == 270)
+	  {
+#if SVIDEO_ERP_PADDING
+		  if (sVidInfo.bPERP)
+			  inputHeight -= (SVIDEO_ERP_PAD_L + SVIDEO_ERP_PAD_R);
+#endif
+		  sVidInfo.iFaceWidth = inputHeight;
+		  sVidInfo.iFaceHeight = inputWidth;
+	  }
+	  else
+	  {
+#if SVIDEO_ERP_PADDING
+		  if (sVidInfo.bPERP)
+			  inputWidth -= (SVIDEO_ERP_PAD_L + SVIDEO_ERP_PAD_R);
+#endif
+		  sVidInfo.iFaceWidth = inputWidth;
+		  sVidInfo.iFaceHeight = inputHeight;
+	  }
+	  //sVidInfo.framePackStruct.faces[0][0].width = sVidInfo.iFaceWidth;
+	  //sVidInfo.framePackStruct.faces[0][0].height = sVidInfo.iFaceHeight;
+  }
   else if(  (sVidInfo.geoType == SVIDEO_CUBEMAP)
 #if SVIDEO_ADJUSTED_CUBEMAP
           ||(sVidInfo.geoType == SVIDEO_ADJUSTEDCUBEMAP)
@@ -994,6 +1053,7 @@ Void TApp360ConvertCfg::calcOutputResolution(SVideoInfo& sourceSVideoInfo, SVide
 {
   //calulate the coding resolution;
   if(   sourceSVideoInfo.geoType == SVIDEO_EQUIRECT 
+	  || sourceSVideoInfo.geoType == SVIDEO_NEWUNIFORMMAP
 #if SVIDEO_ADJUSTED_EQUALAREA
      || sourceSVideoInfo.geoType == SVIDEO_ADJUSTEDEQUALAREA 
 #else
@@ -1260,6 +1320,57 @@ Void TApp360ConvertCfg::calcOutputResolution(SVideoInfo& sourceSVideoInfo, SVide
 #endif
       }
     }
+	else if (codingSVideoInfo.geoType == SVIDEO_NEWUNIFORMMAP
+#if SVIDEO_ADJUSTED_EQUALAREA
+		|| codingSVideoInfo.geoType == SVIDEO_ADJUSTEDEQUALAREA
+#else
+		|| codingSVideoInfo.geoType == SVIDEO_EQUALAREA
+#endif
+#if SVIDEO_CPPPSNR
+		|| codingSVideoInfo.geoType == SVIDEO_CRASTERSPARABOLIC
+#endif
+		)
+	{
+		codingSVideoInfo.iNumFaces = 1;
+		if (m_iCodingFaceWidth == 0 || m_iCodingFaceHeight == 0)
+		{
+			codingSVideoInfo.iFaceWidth = (sourceSVideoInfo.iFaceWidth + (minCuSize - 1)) / minCuSize*minCuSize;
+			codingSVideoInfo.iFaceHeight = (sourceSVideoInfo.iFaceHeight + (minCuSize - 1)) / minCuSize*minCuSize;
+		}
+		else
+		{
+			codingSVideoInfo.iFaceWidth = (m_iCodingFaceWidth + (minCuSize - 1)) / minCuSize*minCuSize;
+			codingSVideoInfo.iFaceHeight = (m_iCodingFaceHeight + (minCuSize - 1)) / minCuSize*minCuSize;
+		}
+
+		Int degree = codingSVideoInfo.framePackStruct.faces[0][0].rot;
+		if (degree == 90 || degree == 270)
+		{
+			iOutputWidth = codingSVideoInfo.iFaceHeight;
+			iOutputHeight = codingSVideoInfo.iFaceWidth;
+#if SVIDEO_ERP_PADDING
+#if 1 //bugfix;
+			if (codingSVideoInfo.bPERP)
+#else
+			if (!sourceSVideoInfo.bPERP && codingSVideoInfo.bPERP)
+#endif
+				iOutputHeight += SVIDEO_ERP_PAD_L + SVIDEO_ERP_PAD_R;
+#endif
+		}
+		else
+		{
+			iOutputWidth = codingSVideoInfo.iFaceWidth;
+			iOutputHeight = codingSVideoInfo.iFaceHeight;
+#if SVIDEO_ERP_PADDING
+#if 1 //bugfix;
+			if (codingSVideoInfo.bPERP)
+#else
+			if (!sourceSVideoInfo.bPERP && codingSVideoInfo.bPERP)
+#endif
+				iOutputWidth += SVIDEO_ERP_PAD_L + SVIDEO_ERP_PAD_R;
+#endif
+		}
+	}
     else
       assert(!"Not supported yet");
   }
@@ -1284,6 +1395,7 @@ Void TApp360ConvertCfg::calcOutputResolution(SVideoInfo& sourceSVideoInfo, SVide
            )
   { 
     if(   codingSVideoInfo.geoType == SVIDEO_EQUIRECT 
+		|| codingSVideoInfo.geoType == SVIDEO_NEWUNIFORMMAP
 #if SVIDEO_ADJUSTED_EQUALAREA
        || codingSVideoInfo.geoType == SVIDEO_ADJUSTEDEQUALAREA 
 #else
@@ -1723,6 +1835,38 @@ Void TApp360ConvertCfg::calcOutputResolution(SVideoInfo& sourceSVideoInfo, SVide
         iOutputHeight = codingSVideoInfo.iFaceHeight;
       }
     }
+	else if (codingSVideoInfo.geoType == SVIDEO_NEWUNIFORMMAP
+#if SVIDEO_ADJUSTED_EQUALAREA
+		|| codingSVideoInfo.geoType == SVIDEO_ADJUSTEDEQUALAREA
+#else
+		|| codingSVideoInfo.geoType == SVIDEO_EQUALAREA
+#endif  
+		)
+	{
+		codingSVideoInfo.iNumFaces = 1;
+		if (m_iCodingFaceWidth == 0 || m_iCodingFaceHeight == 0)
+		{
+			codingSVideoInfo.iFaceWidth = (width + (minCuSize - 1)) / minCuSize*minCuSize;
+			codingSVideoInfo.iFaceHeight = (height + (minCuSize - 1)) / minCuSize*minCuSize;
+		}
+		else
+		{
+			codingSVideoInfo.iFaceWidth = (m_iCodingFaceWidth + (minCuSize - 1)) / minCuSize*minCuSize;
+			codingSVideoInfo.iFaceHeight = (m_iCodingFaceHeight + (minCuSize - 1)) / minCuSize*minCuSize;
+		}
+
+		Int degree = codingSVideoInfo.framePackStruct.faces[0][0].rot;
+		if (degree == 90 || degree == 270)
+		{
+			iOutputWidth = codingSVideoInfo.iFaceHeight;
+			iOutputHeight = codingSVideoInfo.iFaceWidth;
+		}
+		else
+		{
+			iOutputWidth = codingSVideoInfo.iFaceWidth;
+			iOutputHeight = codingSVideoInfo.iFaceHeight;
+		}
+	}
   }
 #endif
   else
@@ -1739,70 +1883,71 @@ Void TApp360ConvertCfg::calcOutputResolution(SVideoInfo& sourceSVideoInfo, SVide
 Void TApp360ConvertCfg::xCheckParameter()
 {
 
-  Bool check_failed = false; /* abort if there is a fatal configuration problem */
+	Bool check_failed = false; /* abort if there is a fatal configuration problem */
 #define xConfirmPara(a,b) check_failed |= confirmPara(a,b)
   //const UInt maxBitDepth=(m_OutputChromaFormatIDC==CHROMA_400) ? m_internalBitDepth[CHANNEL_TYPE_LUMA] : std::max(m_internalBitDepth[CHANNEL_TYPE_LUMA], m_internalBitDepth[CHANNEL_TYPE_CHROMA]);
   // check range of parameters
-  xConfirmPara( m_inputBitDepth[CHANNEL_TYPE_LUMA  ] < 8,                                   "InputBitDepth must be at least 8" );
-  xConfirmPara( m_inputBitDepth[CHANNEL_TYPE_CHROMA] < 8,                                   "InputBitDepthC must be at least 8" );
+	xConfirmPara(m_inputBitDepth[CHANNEL_TYPE_LUMA] < 8, "InputBitDepth must be at least 8");
+	xConfirmPara(m_inputBitDepth[CHANNEL_TYPE_CHROMA] < 8, "InputBitDepthC must be at least 8");
 
-  xConfirmPara( (m_MSBExtendedBitDepth[CHANNEL_TYPE_LUMA  ] < m_inputBitDepth[CHANNEL_TYPE_LUMA  ]), "MSB-extended bit depth for luma channel (--MSBExtendedBitDepth) must be greater than or equal to input bit depth for luma channel (--InputBitDepth)" );
-  xConfirmPara( (m_MSBExtendedBitDepth[CHANNEL_TYPE_CHROMA] < m_inputBitDepth[CHANNEL_TYPE_CHROMA]), "MSB-extended bit depth for chroma channel (--MSBExtendedBitDepthC) must be greater than or equal to input bit depth for chroma channel (--InputBitDepthC)" );
-  xConfirmPara( (m_outputBitDepth[CHANNEL_TYPE_LUMA  ] > m_internalBitDepth[CHANNEL_TYPE_LUMA  ]), "Output bitdepth (--OutputBitDepth) must be less than or equal to internal bit depth (--InternalBitDepth)" );
-  std::string sTempIPCSC="InputColourSpaceConvert must be empty, "+getListOfColourSpaceConverts(true);
-  xConfirmPara( m_inputColourSpaceConvert >= NUMBER_INPUT_COLOUR_SPACE_CONVERSIONS,         sTempIPCSC.c_str() );
-  xConfirmPara( m_InputChromaFormatIDC >= NUM_CHROMA_FORMAT,                                "InputChromaFormatIDC must be either 400, 420, 422 or 444" );
-  xConfirmPara( m_inputGeoParam.chromaFormat >= NUM_CHROMA_FORMAT,                          "InternalChromaFormatIDC must be either 400, 420, 422 or 444" );
-  xConfirmPara( m_OutputChromaFormatIDC >= NUM_CHROMA_FORMAT,                               "OutputChromaFormatIDC must be either 400, 420, 422 or 444" );
-  if(m_OutputChromaFormatIDC == CHROMA_444 && m_inputGeoParam.chromaFormat != CHROMA_444)
-  {
-    printf("InternalChromaFormat is changed to 444 for better conversion quality because the output is 444!\n");
-    m_inputGeoParam.chromaFormat = CHROMA_444;
-  }
-  if(m_InputChromaFormatIDC == CHROMA_444 && m_inputGeoParam.chromaFormat != CHROMA_444)
-  {
-    printf("InternalChromaFormat is changed to 444 because the input is 444!\n");
-    m_inputGeoParam.chromaFormat = CHROMA_444;
-  }
-  if(m_OutputChromaFormatIDC == CHROMA_400 && m_inputGeoParam.chromaFormat != CHROMA_400)
-  {
-    printf("InternalChromaFormat is changed to 400 because the output is 400!\n");
-    m_inputGeoParam.chromaFormat = CHROMA_400;
-  }
-  if(m_InputChromaFormatIDC == CHROMA_400 && m_inputGeoParam.chromaFormat != CHROMA_400)
-  {
-    printf("InternalChromaFormat is changed to 400 because the input is 400!\n");
-    m_inputGeoParam.chromaFormat = CHROMA_400;
-  }
-  if(m_inputGeoParam.chromaFormat != CHROMA_420 && m_inputGeoParam.bResampleChroma)
-  {
-    printf("ResampleChroma is reset to false because the internal chroma format is not 4:2:0!\n");
-    m_inputGeoParam.bResampleChroma = false;
-  }
-  if(m_inputGeoParam.iChromaSampleLocType < 0 || m_inputGeoParam.iChromaSampleLocType > 3)
-  {
-    printf("ChromaSampleLocType must be in the range of [0, 3], and it is reset to 2!\n");
-    m_inputGeoParam.iChromaSampleLocType = 2;
-  }
-  //xConfirmPara( m_iFrameRate <= 0,                                                          "Frame rate must be more than 1" );
-  xConfirmPara( m_framesToBeConverted <= 0,                                                   "Total Number Of Frames encoded must be more than 0" );
-  xConfirmPara( m_temporalSubsampleRatio < 1,                                               "Temporal subsample rate must be no less than 1" );
-  xConfirmPara( m_faceSizeAlignment <= 0,                                                   "m_faceSizeAlignment must be greater than zero");
-  /*
-  xConfirmPara( m_iSourceWidth  % TComSPS::getWinUnitX(m_OutputChromaFormatIDC) != 0, "Picture width must be an integer multiple of the specified chroma subsampling");
-  xConfirmPara( m_iSourceHeight % TComSPS::getWinUnitY(m_OutputChromaFormatIDC) != 0, "Picture height must be an integer multiple of the specified chroma subsampling");
+	xConfirmPara((m_MSBExtendedBitDepth[CHANNEL_TYPE_LUMA] < m_inputBitDepth[CHANNEL_TYPE_LUMA]), "MSB-extended bit depth for luma channel (--MSBExtendedBitDepth) must be greater than or equal to input bit depth for luma channel (--InputBitDepth)");
+	xConfirmPara((m_MSBExtendedBitDepth[CHANNEL_TYPE_CHROMA] < m_inputBitDepth[CHANNEL_TYPE_CHROMA]), "MSB-extended bit depth for chroma channel (--MSBExtendedBitDepthC) must be greater than or equal to input bit depth for chroma channel (--InputBitDepthC)");
+	xConfirmPara((m_outputBitDepth[CHANNEL_TYPE_LUMA] > m_internalBitDepth[CHANNEL_TYPE_LUMA]), "Output bitdepth (--OutputBitDepth) must be less than or equal to internal bit depth (--InternalBitDepth)");
+	std::string sTempIPCSC = "InputColourSpaceConvert must be empty, " + getListOfColourSpaceConverts(true);
+	xConfirmPara(m_inputColourSpaceConvert >= NUMBER_INPUT_COLOUR_SPACE_CONVERSIONS, sTempIPCSC.c_str());
+	xConfirmPara(m_InputChromaFormatIDC >= NUM_CHROMA_FORMAT, "InputChromaFormatIDC must be either 400, 420, 422 or 444");
+	xConfirmPara(m_inputGeoParam.chromaFormat >= NUM_CHROMA_FORMAT, "InternalChromaFormatIDC must be either 400, 420, 422 or 444");
+	xConfirmPara(m_OutputChromaFormatIDC >= NUM_CHROMA_FORMAT, "OutputChromaFormatIDC must be either 400, 420, 422 or 444");
+	if (m_OutputChromaFormatIDC == CHROMA_444 && m_inputGeoParam.chromaFormat != CHROMA_444)
+	{
+		printf("InternalChromaFormat is changed to 444 for better conversion quality because the output is 444!\n");
+		m_inputGeoParam.chromaFormat = CHROMA_444;
+	}
+	if (m_InputChromaFormatIDC == CHROMA_444 && m_inputGeoParam.chromaFormat != CHROMA_444)
+	{
+		printf("InternalChromaFormat is changed to 444 because the input is 444!\n");
+		m_inputGeoParam.chromaFormat = CHROMA_444;
+	}
+	if (m_OutputChromaFormatIDC == CHROMA_400 && m_inputGeoParam.chromaFormat != CHROMA_400)
+	{
+		printf("InternalChromaFormat is changed to 400 because the output is 400!\n");
+		m_inputGeoParam.chromaFormat = CHROMA_400;
+	}
+	if (m_InputChromaFormatIDC == CHROMA_400 && m_inputGeoParam.chromaFormat != CHROMA_400)
+	{
+		printf("InternalChromaFormat is changed to 400 because the input is 400!\n");
+		m_inputGeoParam.chromaFormat = CHROMA_400;
+	}
+	if (m_inputGeoParam.chromaFormat != CHROMA_420 && m_inputGeoParam.bResampleChroma)
+	{
+		printf("ResampleChroma is reset to false because the internal chroma format is not 4:2:0!\n");
+		m_inputGeoParam.bResampleChroma = false;
+	}
+	if (m_inputGeoParam.iChromaSampleLocType < 0 || m_inputGeoParam.iChromaSampleLocType > 3)
+	{
+		printf("ChromaSampleLocType must be in the range of [0, 3], and it is reset to 2!\n");
+		m_inputGeoParam.iChromaSampleLocType = 2;
+	}
+	//xConfirmPara( m_iFrameRate <= 0,                                                          "Frame rate must be more than 1" );
+	xConfirmPara(m_framesToBeConverted <= 0, "Total Number Of Frames encoded must be more than 0");
+	xConfirmPara(m_temporalSubsampleRatio < 1, "Temporal subsample rate must be no less than 1");
+	xConfirmPara(m_faceSizeAlignment <= 0, "m_faceSizeAlignment must be greater than zero");
+	/*
+	xConfirmPara( m_iSourceWidth  % TComSPS::getWinUnitX(m_OutputChromaFormatIDC) != 0, "Picture width must be an integer multiple of the specified chroma subsampling");
+	xConfirmPara( m_iSourceHeight % TComSPS::getWinUnitY(m_OutputChromaFormatIDC) != 0, "Picture height must be an integer multiple of the specified chroma subsampling");
 
-  xConfirmPara( m_aiPad[0] % TComSPS::getWinUnitX(m_OutputChromaFormatIDC) != 0, "Horizontal padding must be an integer multiple of the specified chroma subsampling");
-  xConfirmPara( m_aiPad[1] % TComSPS::getWinUnitY(m_OutputChromaFormatIDC) != 0, "Vertical padding must be an integer multiple of the specified chroma subsampling");
-  
-  xConfirmPara( m_confWinLeft   % TComSPS::getWinUnitX(m_OutputChromaFormatIDC) != 0, "Left conformance window offset must be an integer multiple of the specified chroma subsampling");
-  xConfirmPara( m_confWinRight  % TComSPS::getWinUnitX(m_OutputChromaFormatIDC) != 0, "Right conformance window offset must be an integer multiple of the specified chroma subsampling");
-  xConfirmPara( m_confWinTop    % TComSPS::getWinUnitY(m_OutputChromaFormatIDC) != 0, "Top conformance window offset must be an integer multiple of the specified chroma subsampling");
-  xConfirmPara( m_confWinBottom % TComSPS::getWinUnitY(m_OutputChromaFormatIDC) != 0, "Bottom conformance window offset must be an integer multiple of the specified chroma subsampling");
-  */
-  xConfirmPara(m_faceSizeAlignment<=0, "FaceSizeAlignment must be greater than 0");
-  //check source;
-  if(   m_sourceSVideoInfo.geoType == SVIDEO_EQUIRECT 
+	xConfirmPara( m_aiPad[0] % TComSPS::getWinUnitX(m_OutputChromaFormatIDC) != 0, "Horizontal padding must be an integer multiple of the specified chroma subsampling");
+	xConfirmPara( m_aiPad[1] % TComSPS::getWinUnitY(m_OutputChromaFormatIDC) != 0, "Vertical padding must be an integer multiple of the specified chroma subsampling");
+
+	xConfirmPara( m_confWinLeft   % TComSPS::getWinUnitX(m_OutputChromaFormatIDC) != 0, "Left conformance window offset must be an integer multiple of the specified chroma subsampling");
+	xConfirmPara( m_confWinRight  % TComSPS::getWinUnitX(m_OutputChromaFormatIDC) != 0, "Right conformance window offset must be an integer multiple of the specified chroma subsampling");
+	xConfirmPara( m_confWinTop    % TComSPS::getWinUnitY(m_OutputChromaFormatIDC) != 0, "Top conformance window offset must be an integer multiple of the specified chroma subsampling");
+	xConfirmPara( m_confWinBottom % TComSPS::getWinUnitY(m_OutputChromaFormatIDC) != 0, "Bottom conformance window offset must be an integer multiple of the specified chroma subsampling");
+	*/
+	xConfirmPara(m_faceSizeAlignment <= 0, "FaceSizeAlignment must be greater than 0");
+	//check source;
+	if (m_sourceSVideoInfo.geoType == SVIDEO_EQUIRECT
+		|| m_sourceSVideoInfo.geoType == SVIDEO_NEWUNIFORMMAP
 #if SVIDEO_ADJUSTED_EQUALAREA
      || m_sourceSVideoInfo.geoType == SVIDEO_ADJUSTEDEQUALAREA
 #else
@@ -1865,6 +2010,7 @@ Void TApp360ConvertCfg::xCheckParameter()
 #endif
   //check coding;
   if(   m_codingSVideoInfo.geoType == SVIDEO_EQUIRECT 
+	  || m_codingSVideoInfo.geoType == SVIDEO_NEWUNIFORMMAP
 #if SVIDEO_ADJUSTED_EQUALAREA
      || m_codingSVideoInfo.geoType == SVIDEO_ADJUSTEDEQUALAREA
 #else
@@ -1916,7 +2062,7 @@ Void TApp360ConvertCfg::xCheckParameter()
 #if SVIDEO_SUB_SPHERE
   if(m_codingSVideoInfo.subSphere.bPresent)
   {
-    if(m_codingSVideoInfo.geoType != SVIDEO_EQUIRECT)
+    if((m_codingSVideoInfo.geoType != SVIDEO_EQUIRECT) || (m_codingSVideoInfo.geoType != SVIDEO_NEWUNIFORMMAP))
     {
       printf("SubSphereSettings is not supported for the geometry type: %d, disable it!\n", m_codingSVideoInfo.geoType);
       memset(&(m_codingSVideoInfo.subSphere), 0, sizeof(SubSphereSettings));
@@ -2109,7 +2255,7 @@ Void TApp360ConvertCfg::xPrintParameter()
     printf(" | ");
   }
 #if SVIDEO_ERP_PADDING
-  if(m_sourceSVideoInfo.geoType == SVIDEO_EQUIRECT)
+  if(m_sourceSVideoInfo.geoType == SVIDEO_EQUIRECT || m_sourceSVideoInfo.geoType == SVIDEO_NEWUNIFORMMAP)
     printf("\nInputPERP: %d", m_sourceSVideoInfo.bPERP);
 #endif
   printf("\n\nCodingGeometryType: ");
@@ -2123,7 +2269,7 @@ Void TApp360ConvertCfg::xPrintParameter()
     printf(" | ");
   }
 #if SVIDEO_ERP_PADDING
-  if(m_codingSVideoInfo.geoType == SVIDEO_EQUIRECT)
+  if(m_codingSVideoInfo.geoType == SVIDEO_EQUIRECT || m_codingSVideoInfo.geoType == SVIDEO_NEWUNIFORMMAP)
     printf("\nCodingPERP: %d\n", m_codingSVideoInfo.bPERP);
 #endif
 #if SVIDEO_SUB_SPHERE
@@ -2202,6 +2348,9 @@ Void TApp360ConvertCfg::printGeoTypeName(Int nType, Bool bCompactFPFormat)
   case SVIDEO_EQUIRECT:
     printf("Equirectangular ");
     break;
+  case SVIDEO_NEWUNIFORMMAP:
+	  printf("NewUniformMap ");
+	  break;
   case SVIDEO_CUBEMAP:
     printf("Cubemap ");
     break;
@@ -2395,6 +2544,7 @@ Void  TApp360ConvertCfg::convert()
   Int iAdjustWidth = m_iInputWidth;
   Int iAdjustHeight = m_iInputHeight;
   if(   m_sourceSVideoInfo.geoType == SVIDEO_EQUIRECT 
+	  || m_sourceSVideoInfo.geoType == SVIDEO_NEWUNIFORMMAP
 #if SVIDEO_ADJUSTED_EQUALAREA
      || m_sourceSVideoInfo.geoType == SVIDEO_ADJUSTEDEQUALAREA
 #else

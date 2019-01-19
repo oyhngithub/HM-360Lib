@@ -261,7 +261,8 @@ void TWSPSNRMetric::createTable(TComPicYuv* pcPicD, TGeometry *pcCodingGeomtry)
     dChromaOffset[0] = (m_iChromaSampleLocType == 0 || m_iChromaSampleLocType == 2)? 0 : 0.5;
     dChromaOffset[1] = (m_iChromaSampleLocType == 2 || m_iChromaSampleLocType == 3)? 0 : 0.5;
   }
-  if(pcCodingGeomtry->getType()==SVIDEO_EQUIRECT)
+  if(pcCodingGeomtry->getType()==SVIDEO_EQUIRECT
+  || pcCodingGeomtry->getType() == SVIDEO_NEWUNIFORMMAP)
   {
     Double fWeightSum_Y=0;
     Double fWeightSum_C=0;

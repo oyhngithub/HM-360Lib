@@ -232,7 +232,11 @@ enum GeometryType
 #if SVIDEO_EQUIANGULAR_CUBEMAP 
   SVIDEO_EQUIANGULARCUBEMAP,
 #endif
+
+  SVIDEO_NEWUNIFORMMAP,
+
   SVIDEO_TYPE_NUM,
+
 };
 
 enum SInterpolationType

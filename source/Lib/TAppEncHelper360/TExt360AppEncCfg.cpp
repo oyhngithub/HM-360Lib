@@ -166,6 +166,17 @@ Void TExt360AppEncCfg::xSetDefaultFramePackingParam(SVideoInfo& sVideoInfo)
       frmPack.faces[0][0].id = 0; frmPack.faces[0][0].rot = 0;
     }
   }
+  else if ((sVideoInfo.geoType == SVIDEO_NEWUNIFORMMAP))
+  {
+	  if (sVideoInfo.framePackStruct.rows == 0 || sVideoInfo.framePackStruct.cols == 0)
+	  {
+		  SVideoFPStruct &frmPack = sVideoInfo.framePackStruct;
+		  frmPack.chromaFormatIDC = CHROMA_420;
+		  frmPack.rows = 1;
+		  frmPack.cols = 1;
+		  frmPack.faces[0][0].id = 0; frmPack.faces[0][0].rot = 0;
+	  }
+  }
   else if( (sVideoInfo.geoType == SVIDEO_CUBEMAP) 
 #if SVIDEO_ADJUSTED_CUBEMAP
         || (sVideoInfo.geoType == SVIDEO_ADJUSTEDCUBEMAP)
@@ -587,6 +598,31 @@ Void TExt360AppEncCfg::xFillSourceSVideoInfo(SVideoInfo& sVidInfo, Int inputWidt
       sVidInfo.iFaceHeight = inputHeight;
     }
   }
+  else if ((sVidInfo.geoType == SVIDEO_NEWUNIFORMMAP))
+  {
+	  //assert(sVidInfo.framePackStruct.rows == 1);
+	  //assert(sVidInfo.framePackStruct.cols == 1);
+	  //enforce;
+	  sVidInfo.framePackStruct.rows = 1;
+	  sVidInfo.framePackStruct.cols = 1;
+	  sVidInfo.framePackStruct.faces[0][0].id = 0;
+	  //sVidInfo.framePackStruct.faces[0][0].rot = 0;
+	  sVidInfo.iNumFaces = 1;
+	  if (sVidInfo.framePackStruct.faces[0][0].rot == 90 || sVidInfo.framePackStruct.faces[0][0].rot == 270)
+	  {
+		  sVidInfo.iFaceWidth = inputHeight;
+		  sVidInfo.iFaceHeight = inputWidth;
+	  }
+	  else
+	  {
+#if SVIDEO_ERP_PADDING
+		  if (sVidInfo.bPERP)
+			  inputWidth -= (SVIDEO_ERP_PAD_L + SVIDEO_ERP_PAD_R);
+#endif
+		  sVidInfo.iFaceWidth = inputWidth;
+		  sVidInfo.iFaceHeight = inputHeight;
+	  }
+  }
   else if (  (sVidInfo.geoType == SVIDEO_CUBEMAP)
 #if SVIDEO_ADJUSTED_CUBEMAP
           || (sVidInfo.geoType == SVIDEO_ADJUSTEDCUBEMAP)
@@ -698,6 +734,7 @@ Void TExt360AppEncCfg::xCalcOutputResolution(SVideoInfo& sourceSVideoInfo, SVide
 {
   //calulate the coding resolution;
   if(  sourceSVideoInfo.geoType == SVIDEO_EQUIRECT 
+	|| sourceSVideoInfo.geoType == SVIDEO_NEWUNIFORMMAP
 #if SVIDEO_ADJUSTED_EQUALAREA
     || sourceSVideoInfo.geoType == SVIDEO_ADJUSTEDEQUALAREA
 #else
@@ -921,6 +958,7 @@ Void TExt360AppEncCfg::xCalcOutputResolution(SVideoInfo& sourceSVideoInfo, SVide
       }
     }
     else if(   codingSVideoInfo.geoType ==SVIDEO_EQUIRECT 
+	        || codingSVideoInfo.geoType == SVIDEO_NEWUNIFORMMAP
 #if SVIDEO_ADJUSTED_EQUALAREA
             || codingSVideoInfo.geoType == SVIDEO_ADJUSTEDEQUALAREA
 #else
@@ -976,6 +1014,8 @@ Void TExt360AppEncCfg::xCalcOutputResolution(SVideoInfo& sourceSVideoInfo, SVide
       assert(!"Not supported yet");
     }
   }
+  //else if (sourceSVideoInfo.geoType == SVIDEO_NEWUNIFORMMAP)
+
   else if(    (sourceSVideoInfo.geoType == SVIDEO_CUBEMAP) 
            || (sourceSVideoInfo.geoType == SVIDEO_OCTAHEDRON) 
            || (sourceSVideoInfo.geoType == SVIDEO_ICOSAHEDRON)
@@ -997,6 +1037,7 @@ Void TExt360AppEncCfg::xCalcOutputResolution(SVideoInfo& sourceSVideoInfo, SVide
            )
   { 
     if(  codingSVideoInfo.geoType == SVIDEO_EQUIRECT 
+	  || codingSVideoInfo.geoType == SVIDEO_NEWUNIFORMMAP
 #if SVIDEO_ADJUSTED_EQUALAREA
       || codingSVideoInfo.geoType == SVIDEO_ADJUSTEDEQUALAREA 
 #else
@@ -1423,6 +1464,7 @@ Void TExt360AppEncCfg::xCalcOutputResolution(SVideoInfo& sourceSVideoInfo, SVide
           }
       }
       else if (   codingSVideoInfo.geoType == SVIDEO_EQUIRECT 
+	           || codingSVideoInfo.geoType == SVIDEO_NEWUNIFORMMAP
 #if SVIDEO_ADJUSTED_EQUALAREA
                || codingSVideoInfo.geoType == SVIDEO_ADJUSTEDEQUALAREA
 #else
@@ -1553,6 +1595,7 @@ Bool TExt360AppEncCfg::verifyParameters()
     xConfirmPara(m_faceSizeAlignment<0, "FaceSizeAlignment must be no less than 0");
     //check source;
     if(   m_sourceSVideoInfo.geoType == SVIDEO_EQUIRECT 
+	   || m_sourceSVideoInfo.geoType == SVIDEO_NEWUNIFORMMAP
 #if SVIDEO_ADJUSTED_EQUALAREA
        || m_sourceSVideoInfo.geoType == SVIDEO_ADJUSTEDEQUALAREA
 #else
@@ -1614,6 +1657,7 @@ Bool TExt360AppEncCfg::verifyParameters()
 #endif
     //check coding;
     if(   m_codingSVideoInfo.geoType == SVIDEO_EQUIRECT 
+	   || m_codingSVideoInfo.geoType == SVIDEO_NEWUNIFORMMAP
 #if SVIDEO_ADJUSTED_EQUALAREA
        || m_codingSVideoInfo.geoType == SVIDEO_ADJUSTEDEQUALAREA
 #else
